@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="5e789c96-f880-4a53-b362-b6460e599398" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/toy-react_1.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/dist/main.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/main.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.js" beforeDir="false" afterPath="$PROJECT_DIR$/main.js" afterDir="false" />
@@ -61,7 +60,7 @@
       <updated>1598939192387</updated>
       <workItem from="1598939194558" duration="4451000" />
       <workItem from="1599015460068" duration="4219000" />
-      <workItem from="1599101900226" duration="2573000" />
+      <workItem from="1599101900226" duration="4010000" />
     </task>
     <servers />
   </component>
@@ -69,9 +68,9 @@
     <option name="version" value="1" />
   </component>
   <component name="WindowStateProjectService">
-    <state x="305" y="124" width="670" height="676" key="search.everywhere.popup" timestamp="1599024858647">
+    <state x="305" y="124" width="670" height="676" key="search.everywhere.popup" timestamp="1599110877568">
       <screen x="39" y="0" width="1241" height="800" />
     </state>
-    <state x="305" y="124" width="670" height="676" key="search.everywhere.popup/39.0.1241.800@39.0.1241.800" timestamp="1599024858647" />
+    <state x="305" y="124" width="670" height="676" key="search.everywhere.popup/39.0.1241.800@39.0.1241.800" timestamp="1599110877568" />
   </component>
 </project>
