@@ -131,11 +131,7 @@ export class Component {
         // 采用递归的方式访问state
         let merge = (oldState, newState) => {
             for (let p in newState) {
-<<<<<<< HEAD
-                if (oldState[p] === null || typeof oldState[p] !== "object") {
-=======
                 if ( oldState[p] === null || typeof oldState[p] !== "object") {
->>>>>>> e12e9c15d26eb06ef35675e8d410df32df0f70c6
                     oldState[p] = newState[p]
                 } else {
                     // 如果oldSate的p属性为对象，那么就递归调用merge，实现深拷贝
