@@ -1,54 +1,18 @@
 // 通过symbol定义方法名称，保证私有性
 const RENDER_TO_DOM = Symbol("render to dom")
 
-class ElementWrapper {
-    constructor (type) {
-        // 创建根元素
-        this.root = document.createElement(type)
-    }
-    // 配置属性
-    setAttribute (name, value) {
-        if (name.match(/^on([\s\S]+)/)){
-            // 确保事件名小写，将第一个字母转换为小写
-            // console.log('bind')
-            // 之前拿 evemtName = RegExp.$1.replace(/^[\s\S]/, c => c.toLowerCase())
-            // 将eventName传入的方式，绑定事件失败
-            this.root.addEventListener(RegExp.$1.replace(/^[\s\S]/, c => c.toLowerCase()), value)
-        } else{
-            if (name === "className"){
-                this.root.setAttribute("class", value)
-            } else {
-                this.root.setAttribute(name, value)
-            }
-        }
-    }
+function replaceContent(range, node) {
+    // 将node插入range，此时node在range的最前位置
+    range.insertNode(node)
 
-    // 支持dom重绘
-    [RENDER_TO_DOM] (range) {
-        range.deleteContents()
-        range.insertNode(this.root)
-    }
+    // range挪到node之后
+    range.setStartAfter(node)
+    // 清空range
+    range.deleteContents()
 
-    // 由于采用了range，所以增加child也要修改
-    appendChild (component) {
-        let range = document.createRange()
-        // 将新增的元素置于range末尾
-        range.setStart(this.root, this.root.childNodes.length)
-        range.setEnd(this.root, this.root.childNodes.length)
-        component[RENDER_TO_DOM](range)
-    }
-}
-//文本节点不需要设置属性及添加子元素
-class TextWrapper {
-    constructor (content) {
-        this.root = document.createTextNode(content)
-    }
-    [RENDER_TO_DOM] (range) {
-        // 首先从文档中移除 Range 包含的内容。
-        range.deleteContents()
-        //再将root插入range，完成渲染
-        range.insertNode(this.root)
-    }
+    // 重设range的位置
+    range.setStartBefore(node)
+    range.setEndAfter(node)
 }
 
 export class Component {
@@ -57,7 +21,6 @@ export class Component {
         // 取到props
         this.props = Object.create(null)
         this.children = []
-        // 初始化root
         this._root = null
         this._range = null
     }
@@ -70,12 +33,98 @@ export class Component {
         this.children.push(component)
     }
 
+    get vdom () {
+        return this.render().vdom
+    }
+
+    // [RENDER_TO_DOM]方法保留了this._range
+    [RENDER_TO_DOM] (range) {
+        this._range = range
+        this._vdom = this.vdom
+        this._vdom[RENDER_TO_DOM](range)
+    }
+    update () {
+        console.log('update')
+
+        let isSameNode = (oldNode, newNode) => {
+
+            // type不同，则为不同节点
+            if (oldNode.type !== newNode.type) {
+                return false
+            }
+
+            // props不同，则为不同节点
+            for ( let name in newNode.props) {
+                // 属性值要相同
+                if (newNode.props[name] !== oldNode.props[name]) {
+                    return false
+                }
+            }
+            // props的长度不相同，节点不相同
+            if (Object.keys(oldNode.props).length > Object.keys(newNode.props)) {
+                return false
+            }
+
+            // 文本节点，比对content
+            if (newNode.type === "#text") {
+                if (newNode.content !== oldNode.content) {
+                    return false
+                }
+            }
+            return true
+        }
+
+        let update = (oldNode, newNode) => {
+            // 根节点不同，则全部重新渲染
+            if (!isSameNode(oldNode, newNode)) {
+                // 替换oldNode
+                newNode[RENDER_TO_DOM](oldNode._range)
+                return
+            }
+            newNode._range = oldNode._range
+
+            // children的处理
+            // 因为children属性是实体dom，所以我们要拿到vchildren
+            let newChildren = newNode.vchildren
+            let oldChildren = oldNode.vchildren
+
+            if (!newChildren || !newChildren.length) {
+                return
+            }
+
+            // 记录oldChildren的尾部位置
+            let tailRange = oldChildren[oldChildren.length - 1]._range
+            // 两个数组一起循环，所以不用 for of循环
+            for (let i = 0; i < newChildren.length; i++) {
+                let newChild = newChildren[i]
+                let oldChild = oldChildren[i]
+                if (i < oldChildren.length) {
+                    update(oldChild, newChild)
+                } else {
+                    // 如果newChild比oldChild元素多，我们需要在newChild进行节点插入
+                    // 创建一个需要插入的range
+                    let range = document.createRange()
+                    range.setStart(tailRange.endContainer, tailRange.endOffset)
+                    range.setEnd(tailRange.endContainer, tailRange.endOffset)
+                    newChild[RENDER_TO_DOM](range)
+                    tailRange = range
+                }
+            }
+        }
+        // 保存新的vdom
+        let vdom = this.vdom
+        // 对比vdom
+        update(this._vdom, vdom)
+        // 重新赋值
+        this._vdom = vdom
+    }
     setState (newState) {
+        console.log('setState')
         // state为null时的处理
         if (this.state === null || typeof this.state !== "object") {
             // 如果state为null或不是对象，直接为state赋值newState，并重新渲染组件
             this.state = newState
-            this.rerender()
+            this.update()
             return
         }
 
@@ -92,31 +141,70 @@ export class Component {
         }
 
         merge(this.state, newState)
-        this.rerender()
+        this.update()
     }
 
-    rerender () {
-        // 保存this._range
-        let oldRange = this._range
+}
 
-        // 新创建的range没有宽度，但会改变oldRange的宽度
-        // 新创建的range在this._range的start处
-        let range = document.createRange()
-        range.setStart(oldRange.startContainer, oldRange.startOffset)
-        range.setEnd(oldRange.startContainer, oldRange.startOffset)
-
-        this[RENDER_TO_DOM](range)
-
-        // 重设oldRange的start节点，跳过插入的range
-        oldRange.setStart(range.endContainer, range.endOffset)
-        // 清除oldRange的内容
-        oldRange.deleteContents()
+class ElementWrapper extends Component {
+    constructor (type) {
+        super(type)
+        this.type = type
     }
 
-    // [RENDER_TO_DOM]方法保留了this._range
+    get vdom () {
+        this.vchildren = this.children.map(child => child.vdom)
+        return this
+    }
+
+    // 支持dom重绘
     [RENDER_TO_DOM] (range) {
         this._range = range
-        this.render()[RENDER_TO_DOM](range)
+        // 通过replaceContent代替初始时range.deleteContents()
+        // range.deleteContents()
+
+        let root = document.createElement(this.type)
+
+        for (let name in this.props) {
+            let value = this.props[name]
+            if (name.match(/^on([\s\S]+)/)){
+                root.addEventListener(RegExp.$1.replace(/^[\s\S]/, c => c.toLowerCase()), value)
+            } else{
+                if (name === "className"){
+                    root.setAttribute("class", value)
+                } else {
+                    root.setAttribute(name, value)
+                }
+            }
+        }
+
+        for (let child of this.children) {
+            let childRange = document.createRange()
+            childRange.setStart(root, root.childNodes.length)
+            childRange.setEnd(root, root.childNodes.length)
+            child[RENDER_TO_DOM](childRange)
+        }
+
+        // 完成root的挂载
+        replaceContent(range, root)
+
+    }
+
+}
+//文本节点不需要设置属性及添加子元素
+class TextWrapper extends Component {
+    constructor (content) {
+        super(content)
+        this.type = "#text",
+        this.content = content
+    }
+    get vdom () {
+        return this
+    }
+    [RENDER_TO_DOM] (range) {
+        this._range = range
+        let root = document.createTextNode(this.content)
+        replaceContent(range, root)
     }
 }
 
